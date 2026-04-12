@@ -96,9 +96,9 @@
 <div class="stats-row">
     <div class="stat"><b id="s-total">0</b><small>Registered</small></div>
     <div class="stat"><b id="s-active">0</b><small>Active</small></div>
-    <div class="stat"><b id="s-l2">0</b><small>Level 2+</small></div>
-    <div class="stat"><b id="s-l3">0</b><small>Level 3</small></div>
-    <div class="stat"><b id="s-agents">0</b><small>Agents Built</small></div>
+    <div class="stat"><b id="s-l3">0</b><small>Shipping</small></div>
+    <div class="stat"><b id="s-kb">0</b><small>KB Entries Added</small></div>
+    <div class="stat"><b id="s-reviews">0</b><small>Peer Reviews</small></div>
     <div class="stat"><b id="s-drop">0</b><small>Dropped</small></div>
     <div class="stat"><b id="s-conv">0%</b><small>L1→L3 Rate</small></div>
 </div>
@@ -124,7 +124,7 @@
                 <button class="fbtn" onclick="filt(0,this)">Dropped</button>
             </div>
             <div class="table-wrap">
-                <table><thead><tr><th>#</th><th>Name</th><th>Lvl</th><th>Score</th><th>Velocity</th><th>Skills</th><th>Team</th></tr></thead><tbody id="tbody"></tbody></table>
+                <table><thead><tr><th>#</th><th>Name</th><th>Lvl</th><th>Score</th><th>Velocity</th><th>Impact</th><th>Team</th></tr></thead><tbody id="tbody"></tbody></table>
             </div>
         </div>
 
@@ -195,7 +195,7 @@ function generateCohort(stage) {
         } else if (i < cfg.l3 + cfg.dropped) {
             level = 3;
             score = Math.round(cfg.maxScore * (1 - rank * 0.6) + s2 * 2);
-            agents = stage === 'month2' ? Math.floor(s3 * 5) + 1 : stage === 'week4' ? Math.floor(s3 * 3) + 1 : stage === 'week2' ? Math.floor(s3 * 2) : 0;
+            agents = 0; // deprecated — impact tracks real contribution now
             velocity = rank < 0.3 ? "+++" : rank < 0.6 ? "++" : "+";
             if (cfg.teams) team = teamNames[Math.floor(s2 * teamNames.length)] + (rank < 0.08 ? " (Lead)" : "");
         } else if (i < cfg.l3 + cfg.l2 + cfg.dropped) {
@@ -211,7 +211,24 @@ function generateCohort(stage) {
             continue; // not yet registered
         }
 
-        people.push({ name, github, level, score, skills: [...new Set(skills)], interest, team, agents, velocity, dropped });
+        // Impact: what did they actually contribute?
+        let impact = "";
+        if (level === 3 && !dropped) {
+            const impacts = ["module used by 2 peers","KB entry merged","reviewed 3 PRs","fixed security bug","mentored L1 intern","wrote case study","built reusable tool","integrated with A2A","shipped working demo","added 4 KB entries","ran team standup","debugged MCP issue for 3 people"];
+            if (stage === 'month2' || stage === 'week4') {
+                const ni = 1 + Math.floor(s3 * 3);
+                const picked = [];
+                for (let k = 0; k < ni; k++) picked.push(impacts[Math.floor(seed(i * 7 + k) * impacts.length)]);
+                impact = picked.join(", ");
+            } else if (stage === 'week2') {
+                impact = impacts[Math.floor(s3 * impacts.length)];
+            }
+        } else if (level === 2 && !dropped && (stage === 'week4' || stage === 'month2')) {
+            const l2impacts = ["filed 2 bug reports","wrote test cases","documented setup for Windows","translated README to Hindi"];
+            impact = l2impacts[Math.floor(s3 * l2impacts.length)];
+        }
+
+        people.push({ name, github, level, score, skills: [...new Set(skills)], interest, team, agents: 0, velocity, dropped, impact });
     }
 
     people.sort((a, b) => {
@@ -287,23 +304,24 @@ function render() {
     const active = data.filter(d => !d.dropped).length;
     const l2plus = data.filter(d => d.level >= 2).length;
     const l3 = data.filter(d => d.level >= 3).length;
-    const ag = data.reduce((s, d) => s + (d.agents || 0), 0);
     const drop = data.filter(d => d.dropped).length;
     const l1count = data.filter(d => d.level >= 1 && !d.dropped).length;
     const conv = l1count > 0 ? Math.round((l3 / l1count) * 100) : 0;
+    const kbAdded = cur === 'month2' ? 26 : cur === 'week4' ? 12 : cur === 'week2' ? 4 : cur === 'day7' ? 1 : 0;
+    const reviews = cur === 'month2' ? 84 : cur === 'week4' ? 38 : cur === 'week2' ? 12 : 0;
 
     document.getElementById('s-total').textContent = total;
     document.getElementById('s-active').textContent = active;
-    document.getElementById('s-l2').textContent = l2plus;
     document.getElementById('s-l3').textContent = l3;
-    document.getElementById('s-agents').textContent = ag;
+    document.getElementById('s-kb').textContent = kbAdded;
+    document.getElementById('s-reviews').textContent = reviews;
     document.getElementById('s-drop').textContent = drop;
     document.getElementById('s-conv').textContent = conv + '%';
 
     // Filter
     if (curFilt === 0) data = data.filter(d => d.dropped);
     else if (curFilt !== 'all') data = data.filter(d => d.level === curFilt && !d.dropped);
-    if (curSearch) data = data.filter(d => d.name.toLowerCase().includes(curSearch) || d.skills.some(s => s.includes(curSearch)) || d.team.toLowerCase().includes(curSearch));
+    if (curSearch) data = data.filter(d => d.name.toLowerCase().includes(curSearch) || d.skills.some(s => s.includes(curSearch)) || d.team.toLowerCase().includes(curSearch) || (d.impact && d.impact.toLowerCase().includes(curSearch)));
 
     // Table
     const maxSc = Math.max(...allData.map(d => d.score), 1);
@@ -313,11 +331,10 @@ function render() {
         const lvCls = d.dropped ? 'lv0' : `lv${d.level}`;
         const lvTxt = d.dropped ? 'DROP' : `L${d.level}`;
         const pct = Math.round((d.score / maxSc) * 100);
-        const tags = d.skills.slice(0, 3).map(s => `<span class="tag">${s}</span>`).join('');
         const vCls = d.velocity.includes('+') ? 'v-up' : d.velocity === 'new' ? 'v-new' : 'v-flat';
         const vTxt = d.velocity || '—';
-        const agTxt = d.agents ? ` <span style="color:#b794f4;font-size:0.7rem">${d.agents}x</span>` : '';
-        return `<tr><td class="${rc}">${i+1}</td><td>${d.name}${agTxt}</td><td><span class="lv ${lvCls}">${lvTxt}</span></td><td><span class="bar"><span class="fill" style="width:${pct}%"></span></span><span class="sc">${d.score}</span></td><td><span class="velocity ${vCls}">${vTxt}</span></td><td>${tags}</td><td style="font-size:0.75rem;color:#718096">${d.team}</td></tr>`;
+        const impactTxt = d.impact ? `<span style="font-size:0.73rem;color:#a0aec0">${d.impact}</span>` : '<span style="color:#4a5568;font-size:0.73rem">—</span>';
+        return `<tr><td class="${rc}">${i+1}</td><td>${d.name}</td><td><span class="lv ${lvCls}">${lvTxt}</span></td><td><span class="bar"><span class="fill" style="width:${pct}%"></span></span><span class="sc">${d.score}</span></td><td><span class="velocity ${vCls}">${vTxt}</span></td><td>${impactTxt}</td><td style="font-size:0.75rem;color:#718096">${d.team}</td></tr>`;
     }).join('');
 
     // Alerts
