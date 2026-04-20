@@ -1,0 +1,91 @@
+name: Update Leaderboard Data
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'contributors/**'
+      - 'submissions/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-leaderboard:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate leaderboard data JSON
+        run: |
+          mkdir -p docs
+
+          python3 << 'PYEOF'
+          import json, os, glob
+
+          contributors = []
+          for f in sorted(glob.glob("contributors/*.json")):
+              if "TEMPLATE" in f:
+                  continue
+              try:
+                  data = json.load(open(f))
+                  name = data.get("name", "Unknown")
+                  github = data.get("github", "")
+                  skills = data.get("skills", [])
+                  interests = data.get("interests", [])
+                  track = data.get("track", "")
+
+                  # Detect level from submissions
+                  level = 1
+                  slug = os.path.basename(f).replace(".json", "")
+                  sub_dir = f"submissions/{slug}"
+                  if os.path.exists(f"{sub_dir}/level3.md"):
+                      level = 3
+                  elif os.path.exists(f"{sub_dir}/level2.md"):
+                      level = 2
+
+                  contributors.append({
+                      "name": name,
+                      "github": github,
+                      "skills": skills,
+                      "interests": interests,
+                      "track": track,
+                      "level": level,
+                  })
+              except:
+                  continue
+
+          contributors.sort(key=lambda x: (-x["level"], x["name"]))
+
+          # Write data JSON — the custom index.html reads this
+          with open("docs/data.json", "w") as f:
+              json.dump({"contributors": contributors, "generated": True}, f, indent=2)
+
+          print(f"Leaderboard data: {len(contributors)} contributors")
+          PYEOF
+
+      - name: Commit data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data.json
+          git diff --cached --quiet || git commit -m "Update leaderboard data [automated]"
+          git push
+
+      - name: Deploy to GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

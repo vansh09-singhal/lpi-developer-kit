@@ -1,0 +1,10 @@
+{
+  "name": "Your Full Name",
+  "github": "your-github-username",
+  "program": "B.Tech CSE / M.Tech AI / etc",
+  "campus": "Amity Noida / Lucknow / etc",
+  "skills": ["python", "pytorch", "react"],
+  "interests": ["agents", "NLP", "3D", "security"],
+  "track": "A: Agent Builders / B: Content & Research / C: Design & UX / D: 3D & Visualization / E: QA & Security",
+  "my_twin": "If I had a personal digital twin, it would track _____ because _____"
+}

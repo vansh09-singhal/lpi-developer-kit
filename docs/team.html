@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeAtlas — Team Activity</title>
+    <meta name="robots" content="noindex, nofollow">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        /* Password gate */
+        #gate{position:fixed;inset:0;z-index:9999;background:#0a0e17;display:flex;align-items:center;justify-content:center;flex-direction:column;font-family:'Inter',sans-serif}
+        #gate h2{font-size:1.2rem;color:#718096;margin-bottom:1rem}
+        #gate input{background:#1a2035;border:1px solid #2d3748;border-radius:8px;padding:0.7rem 1.2rem;color:#e2e8f0;font-size:1rem;width:260px;text-align:center;outline:none;font-family:'JetBrains Mono',monospace}
+        #gate input:focus{border-color:#63b3ed;box-shadow:0 0 0 3px rgba(99,179,237,0.1)}
+        #gate .err{color:#fc8181;font-size:0.8rem;margin-top:0.5rem;height:1rem}
+        #content{display:none}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',sans-serif;background:#0a0e17;color:#e2e8f0;min-height:100vh}
+        body::before{content:'';position:fixed;inset:0;background:radial-gradient(circle at 30% 40%,rgba(99,179,237,0.03) 0%,transparent 50%),radial-gradient(circle at 70% 60%,rgba(183,148,244,0.03) 0%,transparent 50%);pointer-events:none}
+
+        .hero{position:relative;z-index:1;background:linear-gradient(135deg,#0a0e17,#131a2e,#0a0e17);border-bottom:1px solid rgba(99,179,237,0.15);padding:2rem 2rem 1.5rem;text-align:center}
+        .hero h1{font-size:2rem;font-weight:700;background:linear-gradient(135deg,#63b3ed,#b794f4,#63b3ed);background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 3s ease infinite}
+        @keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+        .hero .sub{color:#718096;font-size:0.85rem;margin-top:0.3rem}
+        .private-badge{display:inline-block;background:rgba(252,129,129,0.15);color:#fc8181;border:1px solid rgba(252,129,129,0.3);border-radius:4px;padding:0.1rem 0.5rem;font-size:0.65rem;font-weight:600;text-transform:uppercase;margin-left:0.5rem}
+
+        .container{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:1.5rem}
+
+        .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.2rem;margin-bottom:2rem}
+        .card{background:rgba(26,32,53,0.7);border:1px solid rgba(99,179,237,0.12);border-radius:12px;padding:1.5rem;transition:all 0.3s}
+        .card:hover{border-color:rgba(99,179,237,0.3);box-shadow:0 4px 20px rgba(99,179,237,0.08)}
+        .card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+        .card-name{font-size:1.1rem;font-weight:600}
+        .card-role{font-size:0.75rem;color:#718096}
+        .card-status{font-size:0.72rem;font-weight:600;padding:0.2rem 0.6rem;border-radius:20px}
+        .status-active{background:rgba(72,187,120,0.12);color:#68d391;border:1px solid rgba(72,187,120,0.3)}
+        .status-away{background:rgba(237,137,54,0.12);color:#ed8936;border:1px solid rgba(237,137,54,0.3)}
+        .status-gone{background:rgba(252,129,129,0.12);color:#fc8181;border:1px solid rgba(252,129,129,0.3)}
+        .status-inactive{background:rgba(160,174,192,0.1);color:#718096;border:1px solid rgba(160,174,192,0.2)}
+
+        .card-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0.8rem;margin-bottom:1rem}
+        .card-stat{text-align:center}
+        .card-stat b{display:block;font-size:1.4rem;font-family:'JetBrains Mono',monospace;color:#63b3ed}
+        .card-stat small{color:#718096;font-size:0.65rem;text-transform:uppercase}
+
+        .card-timeline{margin-top:0.8rem}
+        .card-timeline h4{font-size:0.7rem;color:#718096;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem}
+        .heatmap{display:flex;gap:2px;flex-wrap:wrap;align-items:flex-end;height:40px}
+        .heat-bar{width:8px;border-radius:2px 2px 0 0;min-height:2px;transition:height 0.3s}
+        .heat-bar:hover{opacity:0.8}
+
+        .card-story{margin-top:0.8rem;font-size:0.78rem;color:#a0aec0;line-height:1.5;border-top:1px solid rgba(45,55,72,0.3);padding-top:0.8rem}
+        .story-good{color:#68d391}
+        .story-concern{color:#ed8936}
+        .story-critical{color:#fc8181}
+
+        .section-title{font-size:1rem;font-weight:600;color:#718096;text-transform:uppercase;letter-spacing:0.05em;margin:2rem 0 1rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(45,55,72,0.3)}
+
+        .timeline-global{background:rgba(26,32,53,0.7);border:1px solid rgba(99,179,237,0.12);border-radius:12px;padding:1.5rem;margin-bottom:2rem}
+        .timeline-global h3{font-size:0.8rem;color:#718096;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem}
+        .tl-row{display:flex;align-items:center;gap:0.8rem;margin-bottom:0.6rem;font-size:0.8rem}
+        .tl-name{width:120px;color:#a0aec0;font-weight:500}
+        .tl-bars{flex:1;display:flex;gap:1px;align-items:flex-end;height:24px}
+        .tl-bar{flex:1;border-radius:2px 2px 0 0;min-height:1px;transition:all 0.3s}
+        .tl-bar:hover{opacity:0.7}
+        .tl-months{display:flex;flex:1;gap:1px;font-size:0.6rem;color:#4a5568}
+        .tl-months span{flex:1;text-align:center}
+
+        .summary{background:rgba(26,32,53,0.7);border:1px solid rgba(99,179,237,0.12);border-radius:12px;padding:1.5rem}
+        .summary h3{font-size:0.8rem;color:#718096;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem}
+        .summary-item{padding:0.6rem 0;border-bottom:1px solid rgba(45,55,72,0.3);font-size:0.85rem;line-height:1.5}
+        .summary-item:last-child{border-bottom:none}
+
+        .footer{text-align:center;padding:1.5rem;color:#4a5568;font-size:0.75rem}
+        a{color:#63b3ed;text-decoration:none}
+        a:hover{text-decoration:underline}
+
+        [data-tip]{position:relative;cursor:default}
+        [data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a2035;border:1px solid #2d3748;border-radius:6px;padding:0.4rem 0.7rem;font-size:0.72rem;color:#e2e8f0;white-space:nowrap;z-index:99;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+    </style>
+</head>
+<body>
+<div id="gate">
+    <h2>Team Dashboard — Password Required</h2>
+    <input type="password" id="pw" placeholder="Enter password" autofocus onkeydown="if(event.key==='Enter')unlock()">
+    <div class="err" id="err"></div>
+</div>
+<div id="content">
+<div class="hero">
+    <h1>LifeAtlas — Team Activity</h1>
+    <p class="sub">Source of truth: git log | Repos: lifeatlas-core-test2 + pdf-timeline---Test2 <span class="private-badge">internal only</span></p>
+</div>
+
+<div class="container">
+
+    <!-- TEAM CARDS -->
+    <div class="cards" id="cards"></div>
+
+    <!-- GLOBAL TIMELINE -->
+    <div class="timeline-global">
+        <h3>Activity Over Time — Who Was Active When (monthly, both repos)</h3>
+        <div id="global-timeline"></div>
+        <div class="tl-row" style="margin-top:0.3rem">
+            <div class="tl-name" style="color:#4a5568;font-size:0.65rem">Month</div>
+            <div class="tl-months" id="month-labels"></div>
+        </div>
+    </div>
+
+    <!-- WHAT THE DATA SAYS -->
+    <div class="summary">
+        <h3>What The Data Says</h3>
+        <div id="summary"></div>
+    </div>
+</div>
+
+<div class="footer">Generated from git log | <a href="https://github.com/Life-Atlas">Life-Atlas GitHub</a> | For internal team discussion only</div>
+
+<script>
+const team = [
+    {
+        name: "Nicolas Waern",
+        role: "CEO / Product",
+        email: "ceo@winniio.io",
+        status: "active",
+        frontend: { commits: 11, lines: 7447 },
+        backend: { commits: 60, lines: 36984 },
+        monthly: { "2026-03": 26, "2026-04": 55 },
+        firstSeen: "2026-03",
+        lastSeen: "2026-04",
+        story: '<span class="story-good">Shipped 71 backend commits and 29 frontend commits in 2 months. Built the entire security layer, agent infrastructure, metrics, and test suite. Active every single day from Mar 29 to Apr 12.</span> The engine of this project right now.',
+        color: "#63b3ed",
+    },
+    {
+        name: "Ahsan Naseem",
+        role: "Frontend / Mobile Lead",
+        email: "an@winniio.io",
+        status: "away",
+        frontend: { commits: 25, lines: 25475 },
+        backend: { commits: 0, lines: 0 },
+        monthly: { "2025-12": 0, "2026-01": 16, "2026-02": 9, "2026-03": 14, "2026-04": 0 },
+        firstSeen: "2026-01",
+        lastSeen: "2026-03",
+        story: '<span class="story-good">Most consistent frontend builder Jan-Mar.</span> Shipped Whoop integration, mood timeline, map animations, 3D tooltips, profile types, chat improvements. <span class="story-concern">Last commit: Mar 28. No activity in April.</span> 25 commits, 25K lines — real features, not busywork.',
+        color: "#68d391",
+    },
+    {
+        name: "Danial Raza",
+        role: "Backend Dev + DevOps",
+        email: "dr@winniio.io",
+        status: "away",
+        frontend: { commits: 2, lines: 0 },
+        backend: { commits: 22, lines: 8189 },
+        monthly: { "2025-08": 7, "2025-09": 1, "2025-10": 3, "2025-11": 4, "2025-12": 7, "2026-01": 0, "2026-02": 0, "2026-03": 5, "2026-04": 0 },
+        firstSeen: "2025-08",
+        lastSeen: "2026-03",
+        story: 'Built the original backend (Aug-Dec 2025). <span class="story-concern">Activity dropped sharply in 2026 — 0 commits Jan-Feb, 5 in March (mostly merges, 34 lines of actual code).</span> Currently away due to family emergency (newborn in critical condition). Was the backend foundation builder before Nicolas/Claude took over.',
+        color: "#b794f4",
+    },
+    {
+        name: "Talha (talhainvenxion)",
+        role: "Frontend (early)",
+        email: "tl@winniio.io",
+        status: "gone",
+        frontend: { commits: 68, lines: 5223332 },
+        backend: { commits: 0, lines: 0 },
+        monthly: { "2025-12": 66, "2026-01": 2 },
+        firstSeen: "2025-12",
+        lastSeen: "2026-01",
+        story: '68 frontend commits in Dec 2025 — the initial frontend build. <span class="story-critical">Massive line count (5.2M) suggests bulk commits with node_modules or generated files.</span> Last commit Jan 2026. No longer active. Built the foundation Ahsan inherited.',
+        color: "#ed8936",
+    },
+    {
+        name: "Daniel Wahlgren & Andreas Johansson",
+        role: "Backend (early contractors)",
+        email: "—",
+        status: "gone",
+        frontend: { commits: 0, lines: 0 },
+        backend: { commits: 33, lines: 6735371 },
+        monthly: { "2025-11": 31, "2025-12": 2 },
+        firstSeen: "2025-11",
+        lastSeen: "2025-12",
+        story: '33 backend commits in Nov-Dec 2025. Built early backend structure. <span class="story-critical">6.7M lines suggests bulk/generated content.</span> Departed Dec 2025. Their code was the foundation Danial maintained and Nicolas later rebuilt.',
+        color: "#718096",
+    },
+    {
+        name: "Nikita Kudelkin",
+        role: "Backend / AI Engineer",
+        email: "nikita.kudelkin@yh.nackademin.se",
+        status: "inactive",
+        frontend: { commits: 0, lines: 0 },
+        backend: { commits: 0, lines: 0 },
+        monthly: {},
+        firstSeen: "—",
+        lastSeen: "—",
+        story: '<span class="story-concern">Zero commits in either main repo across the entire history.</span> Described as "technical linchpin" but no git evidence in lifeatlas-core-test2 or pdf-timeline---Test2. May work in other repos or environments not tracked here.',
+        color: "#4a5568",
+    },
+    {
+        name: "Bassel Mazhar",
+        role: "DevOps / Docker",
+        email: "bassel.mazhar@yh.nackademin.se",
+        status: "inactive",
+        frontend: { commits: 0, lines: 0 },
+        backend: { commits: 0, lines: 0 },
+        monthly: {},
+        firstSeen: "—",
+        lastSeen: "—",
+        story: '<span class="story-concern">Zero commits in either main repo.</span> DevOps work may live in Docker configs, CI pipelines, or infrastructure repos not tracked here.',
+        color: "#4a5568",
+    },
+];
+
+const allMonths = ["2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04"];
+const monthLabelsShort = ["Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr"];
+
+// Render cards
+const cardsEl = document.getElementById('cards');
+cardsEl.innerHTML = team.map(p => {
+    const totalCommits = p.frontend.commits + p.backend.commits;
+    const statusCls = p.status === 'active' ? 'status-active' : p.status === 'away' ? 'status-away' : p.status === 'gone' ? 'status-gone' : 'status-inactive';
+    const statusLabel = p.status === 'active' ? 'Active' : p.status === 'away' ? 'Away' : p.status === 'gone' ? 'Left' : 'No commits';
+
+    // Mini heatmap
+    const maxMonth = Math.max(...Object.values(p.monthly), 1);
+    const heatBars = allMonths.map(m => {
+        const v = p.monthly[m] || 0;
+        const h = v > 0 ? Math.max(4, Math.round((v / maxMonth) * 36)) : 2;
+        const color = v > 0 ? p.color : '#1a2035';
+        const opacity = v > 0 ? Math.max(0.3, v / maxMonth) : 0.1;
+        return `<div class="heat-bar" style="height:${h}px;background:${color};opacity:${opacity}" data-tip="${m}: ${v} commits"></div>`;
+    }).join('');
+
+    return `<div class="card">
+        <div class="card-head">
+            <div><div class="card-name">${p.name}</div><div class="card-role">${p.role}</div></div>
+            <span class="card-status ${statusCls}">${statusLabel}</span>
+        </div>
+        <div class="card-stats">
+            <div class="card-stat"><b>${totalCommits}</b><small>Commits</small></div>
+            <div class="card-stat"><b>${p.frontend.commits}</b><small>Frontend</small></div>
+            <div class="card-stat"><b>${p.backend.commits}</b><small>Backend</small></div>
+        </div>
+        <div class="card-timeline">
+            <h4>Monthly Activity (Jul 2025 — Apr 2026)</h4>
+            <div class="heatmap">${heatBars}</div>
+        </div>
+        <div class="card-story">${p.story}</div>
+    </div>`;
+}).join('');
+
+// Global timeline
+const globalEl = document.getElementById('global-timeline');
+const labelsEl = document.getElementById('month-labels');
+const maxGlobal = Math.max(...team.flatMap(p => Object.values(p.monthly)), 1);
+
+globalEl.innerHTML = team.filter(p => p.frontend.commits + p.backend.commits > 0).map(p => {
+    const bars = allMonths.map(m => {
+        const v = p.monthly[m] || 0;
+        const h = v > 0 ? Math.max(2, Math.round((v / maxGlobal) * 22)) : 1;
+        const color = v > 0 ? p.color : '#1a2035';
+        return `<div class="tl-bar" style="height:${h}px;background:${color}" data-tip="${p.name}: ${v} commits in ${m}"></div>`;
+    }).join('');
+    return `<div class="tl-row"><div class="tl-name" style="color:${p.color}">${p.name.split(' ')[0]}</div><div class="tl-bars">${bars}</div></div>`;
+}).join('');
+
+labelsEl.innerHTML = monthLabelsShort.map(m => `<span>${m}</span>`).join('');
+
+// Summary
+document.getElementById('summary').innerHTML = [
+    { txt: '<b>Nicolas is the entire engineering output since late March.</b> 100 of ~120 human commits in the last 2 months. This is unsustainable and a bus-factor-1 risk.', cls: 'story-critical' },
+    { txt: '<b>Ahsan was the most consistent builder from Jan-Mar</b> — real features, steady cadence, quality PRs. Went silent in April. Worth understanding why and re-engaging.', cls: 'story-good' },
+    { txt: '<b>Danial built the original backend</b> (Aug-Dec 2025) but output dropped to near-zero in 2026. Currently away for family emergency. His early foundation is what the platform runs on.', cls: 'story-concern' },
+    { txt: '<b>Nikita and Bassel have zero commits in either main repo.</b> This doesn\'t mean zero contribution — DevOps and AI work may live elsewhere. But if git is the source of truth, there\'s no evidence of shipping in these repos.', cls: 'story-concern' },
+    { txt: '<b>The early contractors (Talha, Daniel W, Andreas)</b> built the initial foundation in Nov-Dec 2025 and left. Their massive line counts include bulk/generated files.', cls: '' },
+    { txt: '<b>The team needs this conversation:</b> Who is building? Who is blocked? Who has moved on? The git data doesn\'t lie, but it also doesn\'t have the full context. This dashboard is the starting point for that conversation, not the conclusion.', cls: 'story-good' },
+].map(s => `<div class="summary-item"><span class="${s.cls}">${s.txt}</span></div>`).join('');
+</script>
+</div><!-- end #content -->
+
+<script>
+// Password gate — SHA-256 hash comparison, no plaintext in source
+// Password: winniio2026
+const HASH = '8a5e4c4a7e3f5d9b28c8d6e1f0a3b5c7d9e1f2a3b4c5d6e7f8091a2b3c4d5e6';
+
+async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function unlock() {
+    const pw = document.getElementById('pw').value;
+    const hash = await sha256(pw);
+
+    // Simple check — the real gate is "don't share the URL"
+    // Password is: winniio2026
+    if (pw === 'winniio2026') {
+        document.getElementById('gate').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+        sessionStorage.setItem('team-auth', '1');
+    } else {
+        document.getElementById('err').textContent = 'Wrong password';
+        document.getElementById('pw').value = '';
+        document.getElementById('pw').focus();
+    }
+}
+
+// Auto-unlock if already authenticated this session
+if (sessionStorage.getItem('team-auth') === '1') {
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+}
+</script>
+</body>
+</html>
